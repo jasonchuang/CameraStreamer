@@ -1,9 +1,0 @@
-# view AndroidManifest.xml #generated:53
--keep class com.jasonsoft.camerastreamer.CameraStreamerActivity { <init>(...); }
-
-# view res/layout/main.xml #generated:23
--keep class com.jasonsoft.camerastreamer.VideoSurfaceView { <init>(...); }
-
-# view res/layout/main.xml #generated:29
--keep class net.majorkernelpanic.streaming.gl.SurfaceView { <init>(...); }
-
