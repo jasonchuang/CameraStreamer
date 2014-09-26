@@ -12,8 +12,8 @@ import java.io.IOException;
 import net.majorkernelpanic.streaming.rtp.H264Packetizer;
 import net.majorkernelpanic.streaming.rtp.MediaCodecInputStream;
 
-public class InstaVideoPacketizer extends H264Packetizer {
-    private static final String TAG = InstaVideoPacketizer.class.getSimpleName();
+public class H264VideoPacketizer extends H264Packetizer {
+    private static final String TAG = H264VideoPacketizer.class.getSimpleName();
 
     public static final int NALU_TYPE_SLICE = 1;
     public static final int NALU_TYPE_SLICE_IDR = 5;
@@ -25,7 +25,7 @@ public class InstaVideoPacketizer extends H264Packetizer {
     private byte[] mSpsPps = null;
     private byte[] mEncodedDataBuffer = new byte[MAXPACKETSIZE];
 
-    public InstaVideoPacketizer() {
+    public H264VideoPacketizer() {
         super();
     }
 

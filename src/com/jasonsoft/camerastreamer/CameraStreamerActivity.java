@@ -99,7 +99,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                 .setAudioQuality(new AudioQuality(16000, 32000))
                 .setVideoEncoder(SessionBuilder.VIDEO_H264)
                 .setVideoQuality(new VideoQuality(VIDEO_WIDTH, VIDEO_HEIGHT, 10, 500000))
-                .setVideoPacketizer(new InstaVideoPacketizer())
+                .setVideoPacketizer(new H264VideoPacketizer())
                 .build();
         mLocalSurfaceView.getHolder().addCallback(this);
         mLocalSurfaceView.setZOrderOnTop(true);
@@ -162,7 +162,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             try {
                 socket = new DatagramSocket(UDP_PORT);
             } catch (SocketException e) {
-                Log.d("jason", "SocketException:" + e);
+                Log.d(TAG, "SocketException:" + e);
             }
 
             if (socket == null) {
@@ -171,16 +171,14 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
 
             while (true) {
                 if (isCancelled()) {
-                    Log.d("jason", "Abort UDP receiving loop");
+                    Log.d(TAG, "Abort UDP receiving loop");
                     socket.close();
                     break;
                 }
 
-//                Log.d("jason", "start receive");
                 try {
                     socket.receive(packet);
                     receivedPacketCounts++;
-//                    Log.d("jason", "Receiving len:" + packet.getLength());
                     int frameLen = parseRTP(packet.getData(), packet.getLength());
                     if (frameLen > 0) {
                         printHexList(mFrameBuffer, Math.min(frameLen, 20));
@@ -189,9 +187,8 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                     }
                     SystemClock.sleep(10);
                 } catch (IOException e) {
-                    Log.d("jason", "IOException:" + e);
+                    Log.d(TAG, "IOException:" + e);
                 }
-                // Log.d("jason", "receive done");
             }
 
             return null;
@@ -204,11 +201,11 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                 sb.append(Integer.toString(value, 16) + " ");
             }
 
-            Log.i("jason", "Hext List:" + sb);
+            Log.i(TAG, "Hext List:" + sb);
         }
 
         private int parseRTP(byte[] data, int len) {
-            Log.d("jason", "parseRTP start");
+            Log.d(TAG, "parseRTP start");
             /* Here is the RTP header
              * 0                   1                   2                   3
              * 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -226,81 +223,18 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             long ts = Utils.readUnsignedInt(data, TS_START_BYTE_INDEX);
             long ssrc = Utils.readUnsignedInt(data, SSRC_START_BYTE_INDEX);
 
-            Log.d("jason", "marker:" + marker);
-//            Log.d("jason", "pt:" + pt);
-            Log.d("jason", "seq:" + seq);
-//            Log.d("jason", "ts:" + ts);
-//            Log.d("jason", "ssrc:" + ssrc);
-//
-//            /* Here is the FU indicator header
-//             * +---------------+
-//             * |0|1|2|3|4|5|6|7|
-//             * +-+-+-+-+-+-+-+-+
-//             * |F|NRI|  Type   |
-//             * +---------------+
-//             */
-//
-//            /* FU Indicator; Type = 28 ---> FU-A */
-//            int type = (int)(data[FU_IDENTIFIER_BYTE_INDEX] & 0x1F);
-//
-//            /* The FU header
-//             * +---------------+
-//             * |0|1|2|3|4|5|6|7|
-//             * +-+-+-+-+-+-+-+-+
-//             * |S|E|R|  Type   |
-//             * +---------------+
-//             */
-//            int startBit = (int)(data[FU_HEADER_INDEX] & 0x80) >> 7;
-//            int endBit = (int)(data[FU_HEADER_INDEX] & 0x40) >> 6;
-//            int nalUnitType = (int)(data[FU_HEADER_INDEX] & 0x1F);
-//            Log.d("jason", "h264 type:" + type);
-//            Log.d("jason", "h264 startBit:" + startBit);
-//            Log.d("jason", "h264 endBit:" + endBit);
-//            Log.d("jason", "h264 Nal_unit_type:" + nalUnitType);
+//            Log.d(TAG, "marker:" + marker);
+//            Log.d(TAG, "seq:" + seq);
 //
             publishProgress(seq);
-
-//            return (type == 1 || type == NAL_UNIT_FU_A || type == NAL_UNIT_FU_B ) ? true : false;
 
             int payloadLen = len - RTP_HEADER_SIZE;
             int offset = RTP_HEADER_SIZE;
 
-//            if (type >= NAL_UNIT_SINGLE_PACKET_START && type <= NAL_UNIT_SINGLE_PACKET_END) {
-//                mFrameBuffer[0] = 0x00;
-//                mFrameBuffer[1] = 0x00;
-//                mFrameBuffer[2] = 0x00;
-//                mFrameBuffer[3] = 0x01;
-//                mFrameBufferPosition += 4;
-//                payloadLen -= RTP_HEADER_SIZE;
-//                offset = RTP_HEADER_SIZE;
-//            } else if (type == NAL_UNIT_FU_A) {
-//                if (startBit == 1) {
-//                    mFrameBufferPosition = 0;
-////                    mFrameBuffer[0] = 0x00;
-////                    mFrameBuffer[1] = 0x00;
-////                    mFrameBuffer[2] = 0x00;
-////                    mFrameBuffer[3] = 0x01;
-//                    int fnri = (int)(data[FU_IDENTIFIER_BYTE_INDEX] & 0xE0);
-//                    mFrameBuffer[0] = (byte)(fnri | nalUnitType);
-//                    mFrameBufferPosition += 1;
-//                }
-//                payloadLen -= H264_RTP_HEADER_SIZE;
-//                offset = H264_RTP_HEADER_SIZE;
-//            } else {
-//                Log.d("jason", "Not a valid nalu type");
-//                return -1;
-//            }
-//
-            Log.d("jason", "packetLen:" + len);
-//            Log.d("jason", "payload Content:");
-//            printHexList(data, Math.min(payloadLen, 20));
-            Log.d("jason", "payload len:" + payloadLen);
-//            Log.d("jason", "before packet copy mFrameBufferPosition:" + mFrameBufferPosition);
             System.arraycopy(data, offset, mFrameBuffer, mFrameBufferPosition, payloadLen);
             mFrameBufferPosition += payloadLen;
-//            Log.d("jason", "after packet copy mFrameBufferPosition:" + mFrameBufferPosition);
 
-            Log.d("jason", "parseRTP end");
+            Log.d(TAG, "parseRTP end");
             if (marker > 0) {
                 int value = mFrameBufferPosition;
                 mFrameBufferPosition = 0;
@@ -374,7 +308,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        Log.d("jason", "surfaceCreated mSession.startPreview:");
+        Log.d(TAG, "surfaceCreated mSession.startPreview:");
         mSession.startPreview();
     }
 
