@@ -118,6 +118,5 @@
         android:ems="10"
         android:gravity="center"
         android:singleLine="true"
-        android:text="127.0.0.1"
         android:textColor="#FF272627"/>
 </RelativeLayout>

@@ -1,13 +1,17 @@
 package com.jasonsoft.camerastreamer;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -32,6 +36,9 @@ import net.majorkernelpanic.streaming.video.VideoQuality;
 public class CameraStreamerActivity extends Activity implements Session.Callback, SurfaceHolder.Callback
             , View.OnClickListener{
     private static final String TAG = CameraStreamerActivity.class.getSimpleName();
+
+    public static final String KEY_DESTINATION_IP_ADDRESS = "destination_ip_address";
+    private static final String LOCAL_IP_ADDRESS = "127.0.0.1";
 
     private static final int BUFFER_SIZE = 8192; // 8K
     private static final int FRAME_BUFFER_SIZE = 500 * 1024; // 500K
@@ -70,6 +77,8 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
 	private Session mSession;
     private EditText mDestinationEditText;
     private boolean mIsViewing;
+    private SharedPreferences mPrefs;
+    private AlertDialog mDialog;
 
     static {
         System.loadLibrary("avutil-52");
@@ -109,6 +118,9 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         mRecordButton.setOnClickListener(this);
         mViewButton.setOnClickListener(this);
         mIsViewing = false;
+
+        mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+        mDestinationEditText.setText(mPrefs.getString(KEY_DESTINATION_IP_ADDRESS, LOCAL_IP_ADDRESS));
     }
 
     @Override
@@ -132,8 +144,22 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
     public void onClick(View v) {
         switch (v.getId()) {
         case R.id.record_button:
+            String destinationIpAddress = mDestinationEditText.getText().toString();
+            if (Utils.isInvalidIpAddress(destinationIpAddress)) {
+                // alrert dialog not start
+
+                mRecordButton.setChecked(false);
+                showInvalidIpAddressDialog();
+                return;
+            }
+
+            // Restore destination ip address
+            Editor editor = mPrefs.edit();
+            editor.putString(KEY_DESTINATION_IP_ADDRESS, destinationIpAddress);
+            editor.commit();
+
             // Starts/stops streaming
-            mSession.setDestination(mDestinationEditText.getText().toString());
+            mSession.setDestination(destinationIpAddress);
             if (!mSession.isStreaming()) {
                 mSession.configure();
                 mRecordButton.setChecked(true);
@@ -161,6 +187,19 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         default:
             break;
         }
+    }
+
+    private void showInvalidIpAddressDialog() {
+        if (mDialog != null) {
+            mDialog.dismiss();
+            mDialog = null;
+        }
+
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this, AlertDialog.THEME_HOLO_LIGHT);
+        builder.setTitle(R.string.error_dialog_title);
+        builder.setMessage(R.string.invalid_ip_address).setPositiveButton(R.string.ok_button, null);
+        mDialog = builder.create();
+        mDialog.show();
     }
 
     class UDPReceiverAsyncTask extends AsyncTask<String, Integer, Void> {

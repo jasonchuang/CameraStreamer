@@ -1,6 +1,9 @@
 package com.jasonsoft.camerastreamer;
 
 import android.util.Log;
+import android.util.Patterns;
+
+import java.util.regex.Pattern;
 
 public class Utils {
 
@@ -44,6 +47,11 @@ public class Utils {
         if (DEBUG_LOG) {
             Log.d(tag, msg);
         }
+    }
+
+    public static boolean isInvalidIpAddress(String ipAddress) {
+        // Check invalid ip address
+        return !Patterns.IP_ADDRESS.matcher(ipAddress).matches();
     }
 
 }
