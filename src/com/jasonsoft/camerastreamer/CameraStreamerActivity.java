@@ -9,6 +9,8 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.SurfaceHolder;
 import android.view.View;
 import android.widget.TextView;
@@ -64,6 +66,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
     private UDPReceiverAsyncTask mUDPReceiverAsyncTask;
     private byte mFrameBuffer[] = new byte[FRAME_BUFFER_SIZE];
     private int mFrameBufferPosition = 0;
+    private long mCurrentFrameTs = 0;
 	private Session mSession;
     private EditText mDestinationEditText;
     private boolean mIsViewing;
@@ -106,6 +109,23 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         mRecordButton.setOnClickListener(this);
         mViewButton.setOnClickListener(this);
         mIsViewing = false;
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.menu_switch_camera:
+                mSession.switchCamera();
+                break;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     }
 
     @Override
@@ -181,9 +201,11 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                     receivedPacketCounts++;
                     int frameLen = parseRTP(packet.getData(), packet.getLength());
                     if (frameLen > 0) {
-                        printHexList(mFrameBuffer, Math.min(frameLen, 20));
-                        nativeStreamingDecodeFrame(mFrameBuffer, frameLen);
-                        mRemoteSurfaceView.setVideoSurfaceBitmap(mRemoteBitmap);
+                        if (isValidH264BitStreaming()) {
+                            printHexList(mFrameBuffer, Math.min(frameLen, 20));
+                            nativeStreamingDecodeFrame(mFrameBuffer, frameLen);
+                            mRemoteSurfaceView.setVideoSurfaceBitmap(mRemoteBitmap);
+                        }
                     }
                     SystemClock.sleep(10);
                 } catch (IOException e) {
@@ -201,11 +223,11 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                 sb.append(Integer.toString(value, 16) + " ");
             }
 
-            Log.i(TAG, "Hext List:" + sb);
+            Utils.printDebugLogs(TAG, "Hext List:" + sb);
         }
 
         private int parseRTP(byte[] data, int len) {
-            Log.d(TAG, "parseRTP start");
+            Utils.printDebugLogs(TAG, "parseRTP start");
             /* Here is the RTP header
              * 0                   1                   2                   3
              * 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -223,9 +245,9 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             long ts = Utils.readUnsignedInt(data, TS_START_BYTE_INDEX);
             long ssrc = Utils.readUnsignedInt(data, SSRC_START_BYTE_INDEX);
 
-//            Log.d(TAG, "marker:" + marker);
-//            Log.d(TAG, "seq:" + seq);
-//
+            Utils.printDebugLogs(TAG, "marker:" + marker);
+            Utils.printDebugLogs(TAG, "seq:" + seq);
+
             publishProgress(seq);
 
             int payloadLen = len - RTP_HEADER_SIZE;
@@ -234,15 +256,23 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             System.arraycopy(data, offset, mFrameBuffer, mFrameBufferPosition, payloadLen);
             mFrameBufferPosition += payloadLen;
 
-            Log.d(TAG, "parseRTP end");
+            Utils.printDebugLogs(TAG, "parseRTP end");
+
+            mCurrentFrameTs = ts;
             if (marker > 0) {
                 int value = mFrameBufferPosition;
                 mFrameBufferPosition = 0;
+                mCurrentFrameTs = 0;
+                Utils.printDebugLogs(TAG, "Got frame!! ready to decode");
                 return value;
             } else {
                 // frame not ready
                 return -1;
             }
+        }
+
+        private boolean isValidH264BitStreaming() {
+            return Utils.isSpsNalu(mFrameBuffer) || Utils.isIdrNalu(mFrameBuffer) || Utils.isSliceNalu(mFrameBuffer);
         }
 
         @Override

@@ -32,8 +32,8 @@
         android:layout_height="120dp"
         android:layout_alignParentTop="true"
         android:layout_alignParentLeft="true"
-        android:layout_marginLeft="10dp"
-        android:layout_marginTop="10dp" />
+        android:layout_marginLeft="4dp"
+        android:layout_marginTop="4dp" />
 
     <TextView
         android:id="@+id/received_stats"
@@ -42,7 +42,7 @@
         android:layout_above="@+id/bottom_action_layout"
         android:layout_centerHorizontal="true"
         android:textColor="#FFFF0000"
-        android:layout_marginBottom="20dp" />
+        android:layout_marginBottom="24dp" />
 
     <TextView
         android:id="@+id/sent_stats"
@@ -118,5 +118,6 @@
         android:ems="10"
         android:gravity="center"
         android:singleLine="true"
-        android:text="192.168.2.122" />
+        android:text="127.0.0.1"
+        android:textColor="#FF272627"/>
 </RelativeLayout>

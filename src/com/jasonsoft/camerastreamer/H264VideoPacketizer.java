@@ -19,7 +19,7 @@ public class H264VideoPacketizer extends H264Packetizer {
     public static final int NALU_TYPE_SLICE_IDR = 5;
     public static final int NALU_TYPE_SPS = 7;
 
-    private static final boolean LOCAL_FILE_DEBUG = true;
+    private static final boolean LOCAL_FILE_DEBUG = false;
 
     private FileOutputStream mFos;
     private byte[] mSpsPps = null;
@@ -53,8 +53,8 @@ public class H264VideoPacketizer extends H264Packetizer {
     protected void send() throws IOException, InterruptedException {
         int maxPayloadLen = MAXPACKETSIZE - rtphl;
         int len = is.read(mEncodedDataBuffer, 0, maxPayloadLen);
-        boolean isSps = isSpsNalu(mEncodedDataBuffer);
-        boolean isIdr = isIdrNalu(mEncodedDataBuffer);
+        boolean isSps = Utils.isSpsNalu(mEncodedDataBuffer);
+        boolean isIdr = Utils.isIdrNalu(mEncodedDataBuffer);
 
         if (isSps) {
             mSpsPps = new byte[len];
@@ -74,13 +74,15 @@ public class H264VideoPacketizer extends H264Packetizer {
             System.arraycopy(mEncodedDataBuffer, 0, buffer, rtphl, sendLen);
         }
 
-//        long ts = ((MediaCodecInputStream)is).getLastBufferInfo().presentationTimeUs*1000L;
+        long ts = ((MediaCodecInputStream)is).getLastBufferInfo().presentationTimeUs*1000L;
         if (len < maxPayloadLen) {
             socket.markNextPacket();
         }
-//        socket.updateTimestamp(ts);
+
+        socket.updateTimestamp(ts);
         super.send(rtphl + sendLen);
-        SystemClock.sleep(40);
+        // 20 ms a little stuck
+        SystemClock.sleep(10);
 
         if (LOCAL_FILE_DEBUG) {
             try {
@@ -88,20 +90,6 @@ public class H264VideoPacketizer extends H264Packetizer {
             } catch (IOException e) {
             }
         }
-    }
-
-    private boolean isSpsNalu(byte[] header) {
-        int type = (int) (header[4] & 0x1F);
-        return isNaluHeaderPrefix(header) && type == NALU_TYPE_SPS;
-    }
-
-    private boolean isIdrNalu(byte[] header) {
-        int type = (int) (header[4] & 0x1F);
-        return isNaluHeaderPrefix(header) && type == NALU_TYPE_SLICE_IDR;
-    }
-
-    private boolean isNaluHeaderPrefix(byte[] header) {
-        return header[0] == 0 && header[1] == 0 && header[2] == 0 && header[3] == 1;
     }
 
     public void stop() {

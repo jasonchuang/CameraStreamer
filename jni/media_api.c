@@ -37,6 +37,8 @@ void* buffer;
 AVFrame *gRGBAFrame = NULL;
 AVFrame *gYUVFrame = NULL;
 
+// #define DEBUG
+
 void ff_log_callback(void *ptr, int level, const char *fmt, va_list vargs)
 {
         LOGV(fmt, vargs);
@@ -329,13 +331,17 @@ Java_com_jasonsoft_camerastreamer_CameraStreamerActivity_nativeStreamingDecodeFr
         jbyteArray data, jint len)
 {
     jbyte *pJbyteBuffer = 0;
+#ifdef DEBUG
     LOGI("nativeStreamingDecodeFrame len:%d", len);
+#endif
 
   if (data) {
       pJbyteBuffer = (char *) (*env)->GetByteArrayElements(env, data, 0);
+//    pJbyteBuffer = (jbyte *)(*env)->GetPrimitiveArrayCritical(env, data, 0);
   } else {
       return;
   }
+
 
     int framefinished;
     AVPacket packet;
@@ -343,16 +349,29 @@ Java_com_jasonsoft_camerastreamer_CameraStreamerActivity_nativeStreamingDecodeFr
     packet.data = (unsigned char *)(pJbyteBuffer);
     packet.size = len;
 
+#ifdef DEBUG
     LOGI("avcodec_decode_video2 len:%d", len);
     LOGI("avcodec_decode_video2 :framefinished payload first:%d", packet.data[0]);
     LOGI("avcodec_decode_video2 :framefinished payload first:%d", packet.data[len / 2]);
     LOGI("avcodec_decode_video2 :framefinished payload first:%d", packet.data[len -1]);
+#endif
 
     int usedLen = avcodec_decode_video2(gStreamingAVCodecContext, gYUVFrame, &framefinished, &packet);
+    if (pJbyteBuffer) {
+        (*env)->ReleaseByteArrayElements(env, data, pJbyteBuffer, JNI_ABORT);
+//      (*env)->ReleasePrimitiveArrayCritical(env, data, pJbyteBuffer, JNI_ABORT);
+    }
+
+
+
+#ifdef DEBUG
     LOGI("avcodec_decode_video2 framefinished:%d", framefinished);
+#endif
 
     if (framefinished) {
-    LOGI("avcodec_decode_video2 gYUVFrame->format:%d", gYUVFrame->format);
+#ifdef DEBUG
+        LOGI("avcodec_decode_video2 gYUVFrame->format:%d", gYUVFrame->format);
+#endif
     if (gYUVFrame->format == PIX_FMT_YUV420P) {
         yuv420_2_rgb8888_neon(gRGBAFrame->data[0],
                 gYUVFrame->data[0], gYUVFrame->data[2], gYUVFrame->data[1],
@@ -361,10 +380,13 @@ Java_com_jasonsoft_camerastreamer_CameraStreamerActivity_nativeStreamingDecodeFr
     } else {
     }
 
-        LOGI("avcodec_decode_video2 width is %d", gStreamingAVCodecContext->width);
-        LOGI("avcodec_decode_video2 height is %d", gStreamingAVCodecContext->height);
-        LOGI("avpicture linesize not right: w=%d h=%d, linesize0=%d linesize1=%d usedLen=%d srcLen=%d", gStreamingAVCodecContext->width,
-                gStreamingAVCodecContext->height, gYUVFrame->linesize[0], gYUVFrame->linesize[1], usedLen, len);
+#ifdef DEBUG
+    LOGI("avcodec_decode_video2 width is %d", gStreamingAVCodecContext->width);
+    LOGI("avcodec_decode_video2 width is %d", gStreamingAVCodecContext->width);
+    LOGI("avcodec_decode_video2 height is %d", gStreamingAVCodecContext->height);
+    LOGI("avpicture linesize not right: w=%d h=%d, linesize0=%d linesize1=%d usedLen=%d srcLen=%d", gStreamingAVCodecContext->width,
+            gStreamingAVCodecContext->height, gYUVFrame->linesize[0], gYUVFrame->linesize[1], usedLen, len);
+#endif
 
 //        sws_scale(gSwsContext, gYUVFrame->data, gYUVFrame->linesize, 0, gVideoAVStream->codec->height,
 //            gRGBAFrame->data, gRGBAFrame->linesize);
