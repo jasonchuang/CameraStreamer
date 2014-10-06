@@ -122,7 +122,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         switch (item.getItemId()) {
             case R.id.menu_switch_camera:
                 mSession.switchCamera();
-                break;
+                return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
