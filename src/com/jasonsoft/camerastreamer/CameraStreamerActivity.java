@@ -7,6 +7,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.graphics.Bitmap;
+import android.media.AudioFormat;
+import android.media.AudioTrack;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -26,6 +29,7 @@ import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.DatagramPacket;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 
 import net.majorkernelpanic.streaming.Session;
 import net.majorkernelpanic.streaming.SessionBuilder;
@@ -42,7 +46,8 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
 
     private static final int BUFFER_SIZE = 8192; // 8K
     private static final int FRAME_BUFFER_SIZE = 500 * 1024; // 500K
-    private static final int UDP_PORT = 5006;
+    private static final int VIDEO_UDP_PORT = 5006;
+    private static final int AUDIO_UDP_PORT = 5004;
 
     private static final int VIDEO_WIDTH = 640;
     private static final int VIDEO_HEIGHT = 480;
@@ -70,9 +75,8 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
     private Bitmap mRemoteBitmap = null;
     private ToggleButton mRecordButton;
     private ToggleButton mViewButton;
-    private UDPReceiverAsyncTask mUDPReceiverAsyncTask;
-    private byte mFrameBuffer[] = new byte[FRAME_BUFFER_SIZE];
-    private int mFrameBufferPosition = 0;
+    private VideoReceiverAsyncTask mVideoReceiverAsyncTask;
+    private AudioReceiverAsyncTask mAudioReceiverAsyncTask;
     private long mCurrentFrameTs = 0;
 	private Session mSession;
     private EditText mDestinationEditText;
@@ -86,6 +90,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         System.loadLibrary("avformat-55");
         System.loadLibrary("avformat-55");
         System.loadLibrary("swscale-2");
+        System.loadLibrary("swresample-0");
 
         System.loadLibrary("media_api");
     }
@@ -107,7 +112,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                 .setSurfaceView(mLocalSurfaceView)
                 .setPreviewOrientation(90)
                 .setContext(getApplicationContext())
-                .setAudioEncoder(SessionBuilder.AUDIO_NONE)
+                .setAudioEncoder(SessionBuilder.AUDIO_AAC)
                 .setAudioQuality(new AudioQuality(16000, 32000))
                 .setVideoEncoder(SessionBuilder.VIDEO_H264)
                 .setVideoQuality(new VideoQuality(VIDEO_WIDTH, VIDEO_HEIGHT, 10, 500000))
@@ -171,14 +176,19 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             break;
         case R.id.view_button:
             if (!mIsViewing) {
-                mUDPReceiverAsyncTask = new UDPReceiverAsyncTask();
-                mUDPReceiverAsyncTask.execute("test");
+                mVideoReceiverAsyncTask = new VideoReceiverAsyncTask();
+                mVideoReceiverAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, VIDEO_UDP_PORT);
+                mAudioReceiverAsyncTask = new AudioReceiverAsyncTask();
+                mAudioReceiverAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, AUDIO_UDP_PORT);
 
                 mIsViewing = true;
                 mViewButton.setChecked(true);
             } else {
-                if (mUDPReceiverAsyncTask != null) {
-                    mUDPReceiverAsyncTask.cancel(true);
+                if (mVideoReceiverAsyncTask != null) {
+                    mVideoReceiverAsyncTask.cancel(true);
+                }
+                if (mAudioReceiverAsyncTask != null) {
+                    mAudioReceiverAsyncTask.cancel(true);
                 }
                 mIsViewing = false;
                 mViewButton.setChecked(false);
@@ -202,70 +212,16 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         mDialog.show();
     }
 
-    class UDPReceiverAsyncTask extends AsyncTask<String, Integer, Void> {
-        private String data;
-        private int receivedPacketCounts = 0;
+    abstract class UDPReceiverAsyncTask extends AsyncTask<Integer, Integer, Void> {
+        protected int receivedPacketCounts = 0;
+        protected byte mFrameBuffer[] = new byte[FRAME_BUFFER_SIZE];
+        protected int mFrameBufferPosition = 0;
 
-        public UDPReceiverAsyncTask() {
-        }
-
-        @Override
-        protected Void doInBackground(String... params) {
-            nativeStreamingMediaInit();
-            mRemoteBitmap = Bitmap.createBitmap(VIDEO_WIDTH, VIDEO_HEIGHT, Bitmap.Config.ARGB_8888);
-            nativeStreamingPrepareBitmap(mRemoteBitmap, VIDEO_WIDTH, VIDEO_HEIGHT);
-
-            byte buffer[] = new byte[BUFFER_SIZE];
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-            DatagramSocket socket = null;
-            try {
-                socket = new DatagramSocket(UDP_PORT);
-            } catch (SocketException e) {
-                Log.d(TAG, "SocketException:" + e);
+        protected int parseRTP(byte[] data, int len) {
+            if (len < RTP_HEADER_SIZE) {
+                return -1;
             }
 
-            if (socket == null) {
-                return null;
-            }
-
-            while (true) {
-                if (isCancelled()) {
-                    Log.d(TAG, "Abort UDP receiving loop");
-                    socket.close();
-                    break;
-                }
-
-                try {
-                    socket.receive(packet);
-                    receivedPacketCounts++;
-                    int frameLen = parseRTP(packet.getData(), packet.getLength());
-                    if (frameLen > 0) {
-                        if (isValidH264BitStreaming()) {
-                            printHexList(mFrameBuffer, Math.min(frameLen, 20));
-                            nativeStreamingDecodeFrame(mFrameBuffer, frameLen);
-                            mRemoteSurfaceView.setVideoSurfaceBitmap(mRemoteBitmap);
-                        }
-                    }
-                    SystemClock.sleep(10);
-                } catch (IOException e) {
-                    Log.d(TAG, "IOException:" + e);
-                }
-            }
-
-            return null;
-        }
-
-        void printHexList(byte[] data, int len) {
-            StringBuffer sb = new StringBuffer();
-            for (int i = 0; i < len; i++) {
-                int value = (int) (data[i] & 0xff);
-                sb.append(Integer.toString(value, 16) + " ");
-            }
-
-            Utils.printDebugLogs(TAG, "Hext List:" + sb);
-        }
-
-        private int parseRTP(byte[] data, int len) {
             Utils.printDebugLogs(TAG, "parseRTP start");
             /* Here is the RTP header
              * 0                   1                   2                   3
@@ -291,6 +247,9 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
 
             int payloadLen = len - RTP_HEADER_SIZE;
             int offset = RTP_HEADER_SIZE;
+            if (mCurrentFrameTs != ts && mCurrentFrameTs != 0 && mFrameBufferPosition != 0) {
+                mFrameBufferPosition = 0;
+            }
 
             System.arraycopy(data, offset, mFrameBuffer, mFrameBufferPosition, payloadLen);
             mFrameBufferPosition += payloadLen;
@@ -310,6 +269,69 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             }
         }
 
+        protected void printHexList(byte[] data, int len) {
+            StringBuffer sb = new StringBuffer();
+            for (int i = 0; i < len; i++) {
+                int value = (int) (data[i] & 0xff);
+                sb.append(Integer.toString(value, 16) + " ");
+            }
+
+            Utils.printDebugLogs(TAG, "Hext List:" + sb);
+        }
+
+    }
+
+    class VideoReceiverAsyncTask extends UDPReceiverAsyncTask {
+
+        public VideoReceiverAsyncTask () {
+        }
+
+        @Override
+        protected Void doInBackground(Integer... params) {
+            nativeStreamingMediaInit();
+            mRemoteBitmap = Bitmap.createBitmap(VIDEO_WIDTH, VIDEO_HEIGHT, Bitmap.Config.ARGB_8888);
+            nativeStreamingPrepareBitmap(mRemoteBitmap, VIDEO_WIDTH, VIDEO_HEIGHT);
+
+            byte buffer[] = new byte[BUFFER_SIZE];
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+            DatagramSocket socket = null;
+            try {
+                socket = new DatagramSocket(params[0]);
+            } catch (SocketException e) {
+                Log.d(TAG, "SocketException:" + e);
+            }
+
+            if (socket == null) {
+                return null;
+            }
+
+            while (true) {
+                if (isCancelled()) {
+                    Log.d(TAG, "Abort Video UDP receiving loop");
+                    socket.close();
+                    break;
+                }
+
+                try {
+                    socket.receive(packet);
+                    receivedPacketCounts++;
+                    int frameLen = parseRTP(packet.getData(), packet.getLength());
+                    if (frameLen > 0) {
+                        if (isValidH264BitStreaming()) {
+                            printHexList(mFrameBuffer, Math.min(frameLen, 20));
+                            nativeStreamingDecodeFrame(mFrameBuffer, frameLen);
+                            mRemoteSurfaceView.setVideoSurfaceBitmap(mRemoteBitmap);
+                        }
+                    }
+                    SystemClock.sleep(10);
+                } catch (IOException e) {
+                    Log.d(TAG, "IOException:" + e);
+                }
+            }
+
+            return null;
+        }
+
         private boolean isValidH264BitStreaming() {
             return Utils.isSpsNalu(mFrameBuffer) || Utils.isIdrNalu(mFrameBuffer) || Utils.isSliceNalu(mFrameBuffer);
         }
@@ -317,6 +339,92 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         @Override
         protected void onProgressUpdate(Integer... params) {
             mReceivedStats.setText(receivedPacketCounts + "/" + params[0]);
+        }
+
+        @Override
+        protected void onPostExecute(Void result) {
+        }
+    }
+
+    class AudioReceiverAsyncTask extends UDPReceiverAsyncTask {
+
+        public AudioReceiverAsyncTask () {
+        }
+
+        @Override
+        protected Void doInBackground(Integer... params) {
+            nativeAudioStreamingInit();
+
+            int sampleRateInHz = 16000;
+            int channelConfig = AudioFormat.CHANNEL_OUT_MONO;
+            int minPlayBufSize = AudioTrack.getMinBufferSize(sampleRateInHz, channelConfig,
+                    AudioFormat.ENCODING_PCM_16BIT);
+
+            AudioTrack audioTrack = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRateInHz,
+                    channelConfig, AudioFormat.ENCODING_PCM_16BIT, minPlayBufSize * 2,
+                    AudioTrack.MODE_STREAM);
+
+            ByteBuffer byteBuffer = ByteBuffer.allocateDirect(minPlayBufSize);
+            Log.d(TAG, "minPlayBufSize:" + minPlayBufSize);
+            nativePrepareAudioByteBuffer(byteBuffer);
+
+            audioTrack.play();
+
+            byte buffer[] = new byte[BUFFER_SIZE];
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+            DatagramSocket socket = null;
+            try {
+                socket = new DatagramSocket(params[0]);
+            } catch (SocketException e) {
+            }
+
+            if (socket == null) {
+                return null;
+            }
+
+            while (true) {
+                if (isCancelled()) {
+                    Log.d(TAG, "Abort Audio UDP receiving loop");
+                    socket.close();
+                    nativeAudioFinish();
+                    break;
+                }
+
+                try {
+                    socket.receive(packet);
+                    receivedPacketCounts++;
+                    int frameLen = parseRTP(packet.getData(), packet.getLength());
+                    if (frameLen > 0) {
+                        if (isValidAACBitStreaming()) {
+                            printHexList(mFrameBuffer, Math.min(frameLen, 20));
+                            int encodedFrameLen = frameLen - 4;
+                            byte encodedFrame[] = new byte[encodedFrameLen];
+                            System.arraycopy(mFrameBuffer, 4, encodedFrame, 0, encodedFrameLen);
+                            printHexList(encodedFrame, Math.min(encodedFrameLen, 20));
+                            int decodedLen = nativeDecodeAudioStreamingFrame(encodedFrame, encodedFrameLen);
+                            if (decodedLen > 0) {
+                                byte[] output = new byte[decodedLen];
+                                byteBuffer.get(output);
+                                byteBuffer.clear();
+                                int written = audioTrack.write(output, 0, decodedLen);
+                            }
+                        }
+                    }
+                    SystemClock.sleep(10);
+                } catch (IOException e) {
+                    Log.d(TAG, "IOException:" + e);
+                }
+            }
+
+            return null;
+        }
+
+        private boolean isValidAACBitStreaming() {
+            return true;
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... params) {
         }
 
         @Override
@@ -348,7 +456,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         // that you can send to the receiver of the stream.
         // For example, to receive the stream in VLC, store the session description in a .sdp file
         // and open it with VLC while streming.
-        Log.d(TAG, mSession.getSessionDescription());
+//        Log.d(TAG, mSession.getSessionDescription());
         mSession.start();
     }
 
@@ -397,4 +505,10 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
     public native int nativeStreamingMediaInit();
     public native int nativeStreamingPrepareBitmap(Bitmap bitmap, int width, int height);
     public native int nativeStreamingDecodeFrame(byte[] inbuf, int len);
+
+    // For audio streaming
+    public native int nativeAudioStreamingInit();
+    public native int nativePrepareAudioByteBuffer(ByteBuffer byteBuffer);
+    public native int nativeDecodeAudioStreamingFrame(byte[] inbuf, int len);
+    public native int nativeAudioFinish();
 }

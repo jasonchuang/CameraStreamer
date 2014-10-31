@@ -15,7 +15,7 @@ import android.view.SurfaceView;
 import android.view.View;
 
 public class VideoSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
-    public static final int APP_BACKGROUND_COLOR = 0xFFF9F9F9;
+    public static final int APP_BACKGROUND_COLOR = 0xFF272627;
 
     // All the stuff we need for playing and showing a video
     private SurfaceHolder mSurfaceHolder = null;
@@ -104,8 +104,8 @@ public class VideoSurfaceView extends SurfaceView implements SurfaceHolder.Callb
             mTempDst.set(0, 0, mSurfaceWidth, mSurfaceHeight);
 
             mBitmapMatrix = mMatrix;
-//            mBitmapMatrix.setRectToRect(mTempSrc, mTempDst, Matrix.ScaleToFit.FILL);
-            mBitmapMatrix.setRectToRect(mTempSrc, mTempDst, Matrix.ScaleToFit.CENTER);
+            mBitmapMatrix.setRectToRect(mTempSrc, mTempDst, Matrix.ScaleToFit.FILL);
+//            mBitmapMatrix.setRectToRect(mTempSrc, mTempDst, Matrix.ScaleToFit.CENTER);
         }
     }
 

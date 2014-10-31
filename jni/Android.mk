@@ -23,9 +23,9 @@ LOCAL_C_INCLUDES += $(LOCAL_PATH)/yuv2rgb/include
 
 LOCAL_MODULE    := media_api
 LOCAL_CFLAGS := -D__ARM_NEON__ -mfpu=neon
-LOCAL_SRC_FILES := media_api.c yuv2rgb/src/yuv2rgb.neon.S
+LOCAL_SRC_FILES := video_api.c yuv2rgb/src/yuv2rgb.neon.S audio_api.c
 LOCAL_LDLIBS := -llog -lz -ljnigraphics -lm
-LOCAL_SHARED_LIBRARIES := libavcodec libavutil libavformat libswscale
+LOCAL_SHARED_LIBRARIES := libavcodec libavutil libavformat libswscale libswresample
 
 include $(BUILD_SHARED_LIBRARY)
 $(call import-module,ffmpeg-2.2/android/armv7-neon)

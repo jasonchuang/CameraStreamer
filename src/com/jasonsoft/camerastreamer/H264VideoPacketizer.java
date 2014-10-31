@@ -29,6 +29,9 @@ public class H264VideoPacketizer extends H264Packetizer {
         super();
     }
 
+    /**
+     * Reads a NAL unit in the FIFO and sends it.
+     */
     @Override
     public void start() {
         Log.d(TAG, "InstaVideoPacketizer start");
@@ -67,7 +70,6 @@ public class H264VideoPacketizer extends H264Packetizer {
         int sendLen = len;
         if (mSpsPps != null && isIdr) {
             System.arraycopy(mSpsPps, 0, buffer, rtphl, mSpsPps.length);
-            System.arraycopy(mEncodedDataBuffer, 0, buffer, rtphl + mSpsPps.length, len);
             System.arraycopy(mEncodedDataBuffer, 0, buffer, rtphl + mSpsPps.length, len);
             sendLen += mSpsPps.length;
         } else {
