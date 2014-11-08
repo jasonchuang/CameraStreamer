@@ -184,18 +184,22 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                 mIsViewing = true;
                 mViewButton.setChecked(true);
             } else {
-                if (mVideoReceiverAsyncTask != null) {
-                    mVideoReceiverAsyncTask.cancel(true);
-                }
-                if (mAudioReceiverAsyncTask != null) {
-                    mAudioReceiverAsyncTask.cancel(true);
-                }
+                stopMediaReceiverAsyncTask();
                 mIsViewing = false;
                 mViewButton.setChecked(false);
             }
             break;
         default:
             break;
+        }
+    }
+
+    private void stopMediaReceiverAsyncTask() {
+        if (mVideoReceiverAsyncTask != null) {
+            mVideoReceiverAsyncTask.cancel(true);
+        }
+        if (mAudioReceiverAsyncTask != null) {
+            mAudioReceiverAsyncTask.cancel(true);
         }
     }
 
@@ -387,6 +391,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                     Log.d(TAG, "Abort Audio UDP receiving loop");
                     socket.close();
                     nativeAudioFinish();
+                    releaseAudioTrack(audioTrack);
                     break;
                 }
 
@@ -417,6 +422,19 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             }
 
             return null;
+        }
+
+        private void releaseAudioTrack(AudioTrack audioTrack) {
+            if (audioTrack.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) {
+                try {
+                    audioTrack.stop();
+                } catch (IllegalStateException e) {
+                }
+
+                audioTrack.flush();
+                audioTrack.release();
+                audioTrack = null;
+            }
         }
 
         private boolean isValidAACBitStreaming() {
@@ -464,6 +482,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
 	public void onDestroy() {
 		super.onDestroy();
 		mSession.release();
+        stopMediaReceiverAsyncTask();
 	}
 
     @Override
