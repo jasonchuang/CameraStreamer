@@ -83,6 +83,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
     private boolean mIsViewing;
     private SharedPreferences mPrefs;
     private AlertDialog mDialog;
+    private Context mContext;
 
     static {
         System.loadLibrary("avutil-52");
@@ -126,6 +127,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         mDestinationEditText.setText(mPrefs.getString(KEY_DESTINATION_IP_ADDRESS, LOCAL_IP_ADDRESS));
+        mContext = this;
     }
 
     @Override
@@ -351,6 +353,8 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
     }
 
     class AudioReceiverAsyncTask extends UDPReceiverAsyncTask {
+        AudioManager mAudioManager;
+        int mOriginalAudioStreamType;
 
         public AudioReceiverAsyncTask () {
         }
@@ -367,6 +371,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             AudioTrack audioTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL, sampleRateInHz,
                     channelConfig, AudioFormat.ENCODING_PCM_16BIT, minPlayBufSize,
                     AudioTrack.MODE_STREAM);
+            setAudioMode(true);
 
             ByteBuffer byteBuffer = ByteBuffer.allocateDirect(minPlayBufSize);
             Log.d(TAG, "minPlayBufSize:" + minPlayBufSize);
@@ -392,6 +397,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                     socket.close();
                     nativeAudioFinish();
                     releaseAudioTrack(audioTrack);
+                    setAudioMode(false);
                     break;
                 }
 
@@ -422,6 +428,33 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             }
 
             return null;
+        }
+
+        private void setAudioMode(boolean startCall) {
+            if (mAudioManager == null && mContext != null) {
+                mAudioManager = (AudioManager)
+                    mContext.getSystemService(Context.AUDIO_SERVICE);
+            }
+
+            if (mAudioManager == null) {
+                Log.d(TAG, "Could not set audio mode - no audio manager");
+                return;
+            }
+
+            if (startCall) {
+                mAudioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+                if (!mAudioManager.isSpeakerphoneOn()) {
+                    mAudioManager.setSpeakerphoneOn(true);
+                }
+                mOriginalAudioStreamType = getVolumeControlStream();
+                setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
+            } else {
+                mAudioManager.setMode(AudioManager.MODE_NORMAL);
+                if (mAudioManager.isSpeakerphoneOn()) {
+                    mAudioManager.setSpeakerphoneOn(false);
+                }
+                setVolumeControlStream(mOriginalAudioStreamType);
+            }
         }
 
         private void releaseAudioTrack(AudioTrack audioTrack) {
