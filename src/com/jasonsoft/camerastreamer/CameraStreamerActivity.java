@@ -364,7 +364,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
             int minPlayBufSize = AudioTrack.getMinBufferSize(sampleRateInHz, channelConfig,
                     AudioFormat.ENCODING_PCM_16BIT) * 2;
 
-            AudioTrack audioTrack = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRateInHz,
+            AudioTrack audioTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL, sampleRateInHz,
                     channelConfig, AudioFormat.ENCODING_PCM_16BIT, minPlayBufSize,
                     AudioTrack.MODE_STREAM);
 
