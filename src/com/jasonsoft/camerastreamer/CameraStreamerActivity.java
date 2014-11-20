@@ -13,7 +13,6 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.Menu;
@@ -51,6 +50,8 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
 
     private static final int VIDEO_WIDTH = 640;
     private static final int VIDEO_HEIGHT = 480;
+    private static final int VIDEO_FRAME_RATE = 10;
+    private static final int VIDEO_BIT_RATE = 500000;
 
     private static final int V_P_X_CC_BYTE_INDEX = 0;
     private static final int M_PT_BYTE_INDEX = 1;
@@ -116,7 +117,7 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                 .setAudioEncoder(SessionBuilder.AUDIO_AAC)
                 .setAudioQuality(new AudioQuality(16000, 32000))
                 .setVideoEncoder(SessionBuilder.VIDEO_H264)
-                .setVideoQuality(new VideoQuality(VIDEO_WIDTH, VIDEO_HEIGHT, 10, 500000))
+                .setVideoQuality(new VideoQuality(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FRAME_RATE, VIDEO_BIT_RATE))
                 .setVideoPacketizer(new H264VideoPacketizer())
                 .build();
         mLocalSurfaceView.getHolder().addCallback(this);
@@ -329,7 +330,6 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                             mRemoteSurfaceView.setVideoSurfaceBitmap(mRemoteBitmap);
                         }
                     }
-                    SystemClock.sleep(10);
                 } catch (IOException e) {
                     Log.d(TAG, "IOException:" + e);
                 }
@@ -421,7 +421,6 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                             }
                         }
                     }
-                    SystemClock.sleep(10);
                 } catch (IOException e) {
                     Log.d(TAG, "IOException:" + e);
                 }
