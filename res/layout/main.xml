@@ -53,7 +53,7 @@
         android:textColor="#FFFF0000"
         android:layout_marginTop="20dp" />
 
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/bottom_action_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -63,50 +63,15 @@
         android:paddingBottom="10dp"
         android:paddingTop="10dp" >
 
-        <View
-            android:id="@+id/padding_left"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@android:color/transparent" />
-
-        <RelativeLayout
-            android:layout_width="0dp"
+        <ToggleButton
+            android:id="@+id/record_button"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1" >
-
-            <ToggleButton
-                android:id="@+id/view_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerInParent="true"
-                android:textOff=""
-                android:textOn=""
-                android:background="@drawable/view_btn" />
-        </RelativeLayout>
-
-        <RelativeLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" >
-
-            <ToggleButton
-                android:id="@+id/record_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerInParent="true"
-                android:textOff=""
-                android:textOn=""
-                android:background="@drawable/record_btn" />
-        </RelativeLayout>
-
-        <View
-            android:id="@+id/padding_right"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:background="@android:color/transparent" />
-    </LinearLayout>
+            android:layout_centerInParent="true"
+            android:textOff=""
+            android:textOn=""
+            android:background="@drawable/record_btn" />
+    </RelativeLayout>
 
     <EditText
         android:id="@+id/destination_edit"

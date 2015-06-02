@@ -75,7 +75,6 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
     private Bitmap mLocalBitmap = null;
     private Bitmap mRemoteBitmap = null;
     private ToggleButton mRecordButton;
-    private ToggleButton mViewButton;
     private VideoReceiverAsyncTask mVideoReceiverAsyncTask;
     private AudioReceiverAsyncTask mAudioReceiverAsyncTask;
     private long mCurrentFrameTs = 0;
@@ -102,7 +101,6 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         mRecordButton = (ToggleButton) findViewById(R.id.record_button);
-        mViewButton = (ToggleButton) findViewById(R.id.view_button);
         mLocalSurfaceView = (SurfaceView) findViewById(R.id.local_surface_view);
         mRemoteSurfaceView = (VideoSurfaceView) findViewById(R.id.remote_surface_view);
         mSentStats = (TextView) findViewById(R.id.sent_stats);
@@ -123,7 +121,6 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
         mLocalSurfaceView.getHolder().addCallback(this);
         mLocalSurfaceView.setZOrderOnTop(true);
         mRecordButton.setOnClickListener(this);
-        mViewButton.setOnClickListener(this);
         mIsViewing = false;
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -152,6 +149,19 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
     public void onClick(View v) {
         switch (v.getId()) {
         case R.id.record_button:
+            if (!mIsViewing) {
+                mVideoReceiverAsyncTask = new VideoReceiverAsyncTask();
+                mVideoReceiverAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, VIDEO_UDP_PORT);
+                mAudioReceiverAsyncTask = new AudioReceiverAsyncTask();
+                mAudioReceiverAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, AUDIO_UDP_PORT);
+
+                mIsViewing = true;
+            } else {
+                stopMediaReceiverAsyncTask();
+                mIsViewing = false;
+            }
+
+
             String destinationIpAddress = mDestinationEditText.getText().toString();
             if (Utils.isInvalidIpAddress(destinationIpAddress)) {
                 // alrert dialog not start
@@ -176,21 +186,6 @@ public class CameraStreamerActivity extends Activity implements Session.Callback
                 mRecordButton.setChecked(false);
             }
 
-            break;
-        case R.id.view_button:
-            if (!mIsViewing) {
-                mVideoReceiverAsyncTask = new VideoReceiverAsyncTask();
-                mVideoReceiverAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, VIDEO_UDP_PORT);
-                mAudioReceiverAsyncTask = new AudioReceiverAsyncTask();
-                mAudioReceiverAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, AUDIO_UDP_PORT);
-
-                mIsViewing = true;
-                mViewButton.setChecked(true);
-            } else {
-                stopMediaReceiverAsyncTask();
-                mIsViewing = false;
-                mViewButton.setChecked(false);
-            }
             break;
         default:
             break;
